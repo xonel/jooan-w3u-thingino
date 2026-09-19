@@ -1,0 +1,68 @@
+#!/bin/sh
+# recovery-shell — Minimal recovery environment in dedicated partition
+# Boots when GPIO button held >10s at power-on (via U-Boot bootcmd_recovery)
+# Provides: flashcp, mkenvimage, fw_printenv/fw_setenv, dd, sf tools, shell.
+
+set -e
+
+export PATH="/sbin:/usr/sbin:/bin:/usr/bin"
+export PS1="recovery# "
+
+LOG_TAG="recovery-shell"
+log() { logger -t "recovery" "$*"; }
+
+echo "=== Thingino Recovery Shell ==="
+echo "Flash: $(cat /proc/mtd | grep -c '^mtd') partitions"
+cat /proc/mtd
+echo ""
+echo "Available tools: flashcp, mkenvimage, fw_printenv, fw_setenv, dd, sf"
+echo "Type 'help' for commands, 'exit' to reboot."
+echo ""
+
+# Simple built-in commands
+cmd_flash_uboot() {
+    [ -n "$1" ] || { echo "Usage: flash_uboot <file.bin>"; return 1; }
+    [ -f "$1" ] || { echo "File not found: $1"; return 1; }
+    echo "Flashing U-Boot to mtd0..."
+    flashcp "$1" /dev/mtd0 && echo "OK" || echo "FAILED"
+}
+
+cmd_flash_env() {
+    [ -n "$1" ] || { echo "Usage: flash_env <file.bin>"; return 1; }
+    [ -f "$1" ] || { echo "File not found: $1"; return 1; }
+    echo "Flashing env to mtd1..."
+    flashcp "$1" /dev/mtd1 && echo "OK" || echo "FAILED"
+}
+
+cmd_restore_factory() {
+    echo "Restoring factory dump (mtd7)..."
+    [ -f /mnt/sd/flash-all-mtd7.bin ] || { echo "Insert SD with flash-all-mtd7.bin"; return 1; }
+    flashcp /mnt/sd/flash-all-mtd7.bin /dev/mtd7 && echo "OK" || echo "FAILED"
+}
+
+cmd_help() {
+    cat <<EOF
+Recovery Shell Commands:
+  flash_uboot <file.bin>    — Flash U-Boot to mtd0
+  flash_env <file.bin>      — Flash env to mtd1
+  restore_factory           — Restore full 8MB from SD (flash-all-mtd7.bin)
+  fw_printenv / fw_setenv   — U-Boot env tools
+  sf probe / sf read/write  — SPI flash raw access
+  exit / reboot             — Reboot camera
+EOF
+}
+
+# Interactive loop
+while true; do
+    printf "recovery# "
+    read -r cmd args
+    case "$cmd" in
+        flash_uboot) cmd_flash_uboot $args ;;
+        flash_env) cmd_flash_env $args ;;
+        restore_factory) cmd_restore_factory ;;
+        help) cmd_help ;;
+        exit|reboot) log "Rebooting from recovery"; reboot -f ;;
+        "") continue ;;
+        *) $cmd $args 2>&1 || echo "Command failed: $cmd $args" ;;
+    esac
+done

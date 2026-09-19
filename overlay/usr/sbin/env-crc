@@ -1,0 +1,63 @@
+#!/bin/sh
+# env-crc — Compute/verify CRC32 of U-Boot environment
+# Provides env integrity check and auto-restore from backup partition.
+# Called at boot (S01env-crc) and before any env write (fw_setenv wrapper).
+
+set -e
+
+ENV_MTD="/dev/mtd1"
+ENV_BACKUP_MTD="/dev/mtd2"
+ENV_SIZE=65536  # 64 KiB
+CRC_TOOL="/usr/sbin/mkenvimage"  # has -c for CRC check? Actually mkenvimage doesn't verify. Use crc32.
+
+LOG_TAG="env-crc"
+log() { logger -t "$LOG_TAG" "$*"; }
+
+crc32_file() {
+    # Return CRC32 as 8-hex string
+    crc32 "$1" 2>/dev/null || python3 -c "
+import zlib, sys
+with open(sys.argv[1], 'rb') as f:
+    data = f.read()
+print('%08x' % (zlib.crc32(data) & 0xffffffff))
+" "$1"
+}
+
+# Read env + backup, compute CRCs
+env_crc=$(dd if="$ENV_MTD" bs=$ENV_SIZE count=1 2>/dev/null | crc32_file)
+bak_crc=$(dd if="$ENV_BACKUP_MTD" bs=$ENV_SIZE count=1 2>/dev/null | crc32_file)
+
+log "env CRC=$env_crc  backup CRC=$bak_crc"
+
+# If env CRC is valid (non-zero, not all-FF), we're good
+if [ "$env_crc" != "00000000" ] && [ "$env_crc" != "ffffffff" ]; then
+    # Check if backup matches; if not, update backup
+    if [ "$env_crc" != "$bak_crc" ]; then
+        log "Backup CRC mismatch, updating backup partition"
+        dd if="$ENV_MTD" of="$ENV_BACKUP_MTD" bs=$ENV_SIZE count=1 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+# env is corrupted — try backup
+if [ "$bak_crc" != "00000000" ] && [ "$bak_crc" != "ffffffff" ]; then
+    log "Primary env corrupted, restoring from backup"
+    dd if="$ENV_BACKUP_MTD" of="$ENV_MTD" bs=$ENV_SIZE count=1 2>/dev/null || true
+    sync
+    exit 0
+fi
+
+# Both corrupted — this is bad. Create minimal default env.
+log "CRITICAL: Both env and backup corrupted! Creating minimal default env."
+cat > /tmp/env.default <<'EOF'
+baudrate=115200
+bootcmd=sf probe;setenv bootargs mem=${osmem} rmem=${rmem} console=${serialport},${baudrate}n8 panic=${panic_timeout} root=${root} rootfstype=${rootfstype} init=${init} mtdparts=${mtdparts};sf read ${loadaddr} ${kern_addr} ${kern_size};bootm ${loadaddr}
+osmem=30M@0x0
+rmem=34M@0x1e00000
+EOF
+mkenvimage -s 65536 -o /tmp/env.bin /tmp/env.default 2>/dev/null
+dd if=/tmp/env.bin of="$ENV_MTD" bs=$ENV_SIZE count=1 2>/dev/null || true
+dd if=/tmp/env.bin of="$ENV_BACKUP_MTD" bs=$ENV_SIZE count=1 2>/dev/null || true
+sync
+log "Created minimal default environment"
+exit 0

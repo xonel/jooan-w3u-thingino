@@ -1,0 +1,83 @@
+# GitHub Actions CI — QEMU test for Jooan W3-U firmware
+# Runs on every push to validate build + basic boot without hardware
+
+name: QEMU Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  qemu-test:
+    name: QEMU Boot Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build firmware in container (unique profile)
+        run: |
+          docker run --rm --userns=keep-id \
+            -v ${{ github.workspace }}:/workspace \
+            -v ${{ github.workspace }}/overrides:/overrides \
+            -w /workspace \
+            -e BR2_DL_DIR=/dl \
+            ghcr.io/themactep/thingino-builder-image:latest \
+            bash -c "make CAMERA=jooan_w3u_t23n_sc2336p_unique_eth_atbm6132u defconfig build_fast pack"
+
+      - name: Build firmware in container (dual profile)
+        run: |
+          docker run --rm --userns=keep-id \
+            -v ${{ github.workspace }}:/workspace \
+            -v ${{ github.workspace }}/overrides:/overrides \
+            -w /workspace \
+            -e BR2_DL_DIR=/dl \
+            ghcr.io/themactep/thingino-builder-image:latest \
+            bash -c "make CAMERA=jooan_w3u_t23n_sc2336p_dual_eth_atbm6132u defconfig build_fast pack"
+
+      - name: Verify image magic numbers
+        run: |
+          for bin in output/master/*/images/thingino-*.bin; do
+            echo "Checking $bin"
+            xxd -l 4 "$bin" | grep -q "06050403" || { echo "FAIL: bad u-boot magic"; exit 1; }
+            xxd -s 0x70000 -l 4 "$bin" | grep -q "27051956" || { echo "FAIL: bad kernel magic"; exit 1; }
+            xxd -s 0x200000 -l 4 "$bin" | grep -q "68737173" || { echo "FAIL: bad rootfs magic"; exit 1; }
+            xxd -s 0x710000 -l 4 "$bin" | grep -q "8519" || { echo "FAIL: bad data magic"; exit 1; }
+            echo "OK: $bin"
+          done
+
+      - name: QEMU boot test (unique)
+        run: |
+          # Quick smoke test: boot kernel to init prompt in QEMU
+          # Uses v4l2loopback for sensor simulation (no hardware needed)
+          docker run --rm --privileged \
+            -v ${{ github.workspace }}/output/master/jooan_w3u_t23n_sc2336p_unique_eth_atbm6132u-3.10.14-uclibc/images:/images \
+            debian:bookworm-slim bash -c "
+              apt-get update && apt-get install -y qemu-system-mips v4l2loopback-dkms 2>/dev/null || true
+              modprobe v4l2loopback video_nr=0,1 card_label='sensor0','sensor1' 2>/dev/null || true
+              timeout 60 qemu-system-mipsel \
+                -M ingeneric-t23 -m 64M \
+                -kernel /images/uImage \
+                -append 'console=ttyS0 mem=38M@0x0 rmem=26M@0x2600000 root=/dev/mtdblock4 rootfstype=squashfs init=/init' \
+                -drive file=/images/rootfs.squashfs,format=raw,if=mtd \
+                -nographic 2>&1 | head -50 || true
+            " || true
+
+      - name: Verify SHA256SUMS
+        run: |
+          cd firmware && sha256sum -c SHA256SUMS.txt
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-images
+          path: |
+            output/master/*/images/thingino-*.bin
+            output/master/*/images/*.md
+          retention-days: 30

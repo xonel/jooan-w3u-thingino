@@ -1,5 +1,5 @@
 # NAME: Jooan W3-U (T23N, SC2336P, ETH, ATBM6132U)
-# FRAG: uboot/v2013-07 soc-xburst1 core
+# FRAG: uboot/v2013-07 soc-xburst1 core uboot/recovery-bootcmd
 BR2_ETHERNET=y
 BR2_INGENIC_SOC_MODEL="t23n"
 BR2_ISP_CLK_200MHZ=y
@@ -13,3 +13,13 @@ BR2_THINGINO_BUTTON=y
 BR2_THINGINO_MOTORS=y
 BR2_THINGINO_SDCARD=y
 FLASH_SIZE_MB=8
+
+# Memory split optimized for single sensor (osmem 38M, rmem 26M)
+BR2_THINGINO_RMEM_MB=26
+
+# Watchdog + recovery
+BR2_PACKAGE_BUSYBOX_WATCHDOG=y
+BR2_PACKAGE_THINGINO_WATCHDOG=y
+
+# Sensor auto-detection
+BR2_PACKAGE_THINGINO_SENSOR_DETECT=y

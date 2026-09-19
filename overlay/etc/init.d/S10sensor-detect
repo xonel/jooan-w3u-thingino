@@ -1,0 +1,133 @@
+#!/bin/sh
+# S10sensor-detect — Auto-detect image sensors at boot, load appropriate drivers
+# and generate a temporary uenv.txt for the next boot if sensor config changed.
+# This allows a single firmware image to work with different sensor combinations.
+
+set -e
+
+I2C_BUS_0=0
+I2C_BUS_1=1
+SENSOR_MAP="/etc/sensor.map"
+UENV_TMP="/tmp/uenv.sensor"
+UENV_PERSIST="/etc/uenv.sensor"
+DRIVER_DIR="/usr/lib/modules/$(uname -r)/ingenic"
+LOG_TAG="sensor-detect"
+
+log() { logger -t "$LOG_TAG" "$*"; }
+die() { log "ERROR: $*"; exit 1; }
+
+# Known sensor signatures: "I2C_ADDR:CHIP_ID=DRIVER_NAME"
+# Format: "0x30:0x10=sc2336p"  (addr:chipid=driver)
+# Multiple entries per address allowed (first match wins).
+KNOWN_SENSORS="
+0x30:0x10=sc2336p
+0x30:0x10=sc2336ps0
+0x32:0x10=sc2336ps1
+0x30:0x22=gc2053
+0x30:0x46=gc4653
+0x30:0x31=imx307
+0x32:0x22=gc2053
+0x32:0x46=gc4653
+0x32:0x31=imx307
+"
+
+# Load sensor.map if present (allows per-device overrides)
+[ -f "$SENSOR_MAP" ] && KNOWN_SENSORS="$(cat "$SENSOR_MAP")"$'\n'"$KNOWN_SENSORS"
+
+probe_i2c() {
+    local bus="$1" addr="$2"
+    i2cget -y "$bus" "$addr" 0x00 2>/dev/null | tr -d '\n'
+}
+
+read_chip_id() {
+    local bus="$1" addr="$2"
+    # Most sensors: chip ID at register 0x00 (16-bit) or 0x0000 (8-bit)
+    # Try 16-bit first (SC2336 family), then 8-bit
+    local v16 v8
+    v16=$(i2cget -y "$bus" "$addr" 0x00 w 2>/dev/null | tr -d '\n')
+    [ -n "$v16" ] && echo "$v16" && return
+    v8=$(i2cget -y "$bus" "$addr" 0x00 2>/dev/null | tr -d '\n')
+    [ -n "$v8" ] && echo "$v8"
+}
+
+match_driver() {
+    local chip_id="$1"
+    echo "$KNOWN_SENSORS" | while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        # line format: "ADDR:CHIP_ID=DRIVER"
+        local entry_addr="${line%%:*}"
+        local rest="${line#*:}"
+        local entry_chip="${rest%%=*}"
+        local driver="${rest#*=}"
+        if [ "$entry_chip" = "$chip_id" ]; then
+            echo "$driver"
+            return
+        fi
+    done
+}
+
+# Main detection
+detected_sensors=""
+for bus in "$I2C_BUS_0" "$I2C_BUS_1"; do
+    for addr in 0x30 0x32 0x36 0x40 0x37; do
+        chip_id=$(read_chip_id "$bus" "$addr")
+        [ -z "$chip_id" ] && continue
+        driver=$(match_driver "$chip_id")
+        [ -z "$driver" ] && continue
+        # Check if driver module exists
+        [ -f "$DRIVER_DIR/${driver}_t23.ko" ] || [ -f "$DRIVER_DIR/sensor_${driver}_t23.ko" ] || continue
+        detected_sensors="${detected_sensors} $bus:$addr:$driver"
+        log "Detected sensor on bus $bus addr $addr: chip_id=$chip_id -> $driver"
+    done
+done
+
+if [ -z "$detected_sensors" ]; then
+    log "No sensors detected, keeping current config"
+    exit 0
+fi
+
+# Generate uenv fragment for detected sensors
+# Format: sensor0=driver@addr, sensor1=driver@addr, sensor_qty=N
+count=0
+sensor0="" sensor1=""
+for entry in $detected_sensors; do
+    count=$((count + 1))
+    bus="${entry%%:*}"; rest="${entry#*:}"
+    addr="${rest%%:*}"; driver="${rest#*:}"
+    if [ $count -eq 1 ]; then
+        sensor0="${driver}@${addr}"
+    elif [ $count -eq 2 ]; then
+        sensor1="${driver}@${addr}"
+    fi
+done
+
+# Build uenv fragment
+{
+    echo "sensor_qty=${count}"
+    [ -n "$sensor0" ] && echo "sensor0=${sensor0}"
+    [ -n "$sensor1" ] && echo "sensor1=${sensor1}"
+} > "$UENV_TMP"
+
+# Compare with persisted config; if different, write new uenv for next boot
+if [ -f "$UENV_PERSIST" ] && cmp -s "$UENV_TMP" "$UENV_PERSIST"; then
+    log "Sensor config unchanged"
+else
+    log "Sensor config changed (qty=$count), writing $UENV_PERSIST"
+    cp "$UENV_TMP" "$UENV_PERSIST"
+    # Signal that uenv needs to be imported on next boot
+    fw_setenv sensor_changed 1 2>/dev/null || true
+fi
+
+# Load kernel modules for detected sensors
+for entry in $detected_sensors; do
+    bus="${entry%%:*}"; rest="${entry#*:}"
+    addr="${rest%%:*}"; driver="${rest#*:}"
+    modpath="$DRIVER_DIR/${driver}_t23.ko"
+    [ -f "$modpath" ] || modpath="$DRIVER_DIR/sensor_${driver}_t23.ko"
+    if [ -f "$modpath" ]; then
+        insmod "$modpath" 2>/dev/null || true
+        log "Loaded $modpath"
+    fi
+done
+
+exit 0

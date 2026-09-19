@@ -1,0 +1,9 @@
+# U-Boot bootcmd_recovery fragment
+# Add to U-Boot env to enable recovery shell via long button press (10s)
+# Place in: configs/fragments/uboot/recovery-bootcmd.fragment
+
+# bootcmd_recovery=if gpio input 59; then echo "Recovery button held"; run recovery_boot; fi
+# recovery_boot=setenv bootargs mem=28M@0x0 rmem=36M@0x1c00000 console=ttyS1,115200n8 root=/dev/mtdblock5 rootfstype=squashfs init=/usr/sbin/recovery-shell; sf read 0x80600000 0x760000 0xA0000; bootm 0x80600000
+
+# Note: GPIO 59 is typical for reset button on T23N boards — verify per board.
+# The recovery kernel @0x760000 (recovery partition) must be built separately.

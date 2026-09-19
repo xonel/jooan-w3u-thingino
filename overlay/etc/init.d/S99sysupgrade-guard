@@ -1,0 +1,55 @@
+#!/bin/sh
+# S99sysupgrade-guard — Prevent accidental full/bootloader flashes via sysupgrade
+# Refuses any image starting with U-Boot magic (06050403) unless
+# FORCE_BOOTLOADER=1 is set in environment AND user confirms interactively.
+# This prevents the brick scenario from issue #386 (sysupgrade -b -p).
+
+set -e
+
+U_BOOT_MAGIC="06050403"
+FORCE_VAR="FORCE_BOOTLOADER"
+
+log() { logger -t "sysupgrade-guard" "$*"; }
+
+# Check if stdin is a terminal (interactive)
+is_interactive() { [ -t 0 ]; }
+
+fw_file="$1"
+[ -n "$fw_file" ] || exit 0  # no file = not our business
+
+# Read first 4 bytes
+magic=$(dd if="$fw_file" bs=1 count=4 2>/dev/null | xxd -p | tr -d '\n')
+[ "$magic" = "$U_BOOT_MAGIC" ] || exit 0  # not a bootloader image = OK
+
+# It IS a bootloader image — enforce guards
+log "Bootloader image detected (magic=$magic)"
+
+# Guard 1: FORCE_BOOTLOADER env must be set
+eval force_val="\$$FORCE_VAR"
+[ "$force_val" = "1" ] || {
+    log "REFUSING bootloader flash: $FORCE_VAR not set to 1"
+    echo "ERROR: Bootloader flashing requires $FORCE_VAR=1 in environment" >&2
+    echo "       This is a safety measure to prevent accidental bricks." >&2
+    exit 1
+}
+
+# Guard 2: Must be interactive (user present to confirm)
+is_interactive || {
+    log "REFUSING bootloader flash: non-interactive session"
+    echo "ERROR: Bootloader flashing requires interactive terminal for confirmation" >&2
+    exit 1
+}
+
+# Guard 3: Explicit user confirmation
+echo "!!! WARNING: You are about to FLASH THE BOOTLOADER !!!" >&2
+echo "This can permanently brick the camera if the image is wrong." >&2
+echo "Type 'YES' (all caps) to confirm, anything else aborts:" >&2
+read -r confirm
+[ "$confirm" = "YES" ] || {
+    log "User aborted bootloader flash"
+    echo "Aborted." >&2
+    exit 1
+}
+
+log "Bootloader flash authorized by user"
+exit 0
