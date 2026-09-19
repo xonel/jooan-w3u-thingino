@@ -1,0 +1,12 @@
+# Local build artifacts / private state — never commit
+user/
+overrides/
+output/
+dl/
+*.log
+backup-cam242/
+*.token
+.envrc
+
+# Editors / OS
+.DS_Store
