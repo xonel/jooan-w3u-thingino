@@ -17,9 +17,15 @@ FLASH_SIZE_MB=8
 # Memory split optimized for single sensor (osmem 38M, rmem 26M)
 BR2_THINGINO_RMEM_MB=26
 
-# Watchdog + recovery
+# Hardware validation & anti-brick
 BR2_PACKAGE_BUSYBOX_WATCHDOG=y
 BR2_PACKAGE_THINGINO_WATCHDOG=y
-
-# Sensor auto-detection
 BR2_PACKAGE_THINGINO_SENSOR_DETECT=y
+BR2_PACKAGE_THINGINO_HW_DETECT=y
+BR2_PACKAGE_THINGINO_SELFTEST=y
+BR2_PACKAGE_THINGINO_MOTOR_DETECT=y
+BR2_PACKAGE_THINGINO_SENSOR_IQ=y
+
+# Kernel config for hardware validation
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="ingenic/t23n"
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL)/configs/kernel/t23-hw-validation.fragment"

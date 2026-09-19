@@ -1,0 +1,27 @@
+# hw-expected.json — Override expected hardware values for this specific unit
+# Copy to /etc/hw-expected.json on the device if values differ from defaults
+# (e.g., different flash chip, different MAC OUI, different motor type)
+
+# Flash JEDEC ID (6 hex chars) - examples:
+# c22017 = MX25L6406E (64Mbit)
+# ef4017 = W25Q64JV (64Mbit)
+# ef4018 = W25Q128JV (128Mbit)
+# EXP_FLASH_ID="c22017"
+
+# RAM in MB
+# EXP_RAM_MB=64
+
+# MAC OUI (first 3 bytes of ethaddr)
+# EXP_MAC_OUI="02:0b:f7"
+
+# Expected sensor I2C addresses (space separated)
+# EXP_SENSOR_ADDRESSES="0x30 0x32"
+
+# Motor driver type: spi_wq9001, gpio, none
+# EXP_MOTOR_TYPE="spi_wq9001"
+
+# WiFi chip
+# EXP_WIFI_CHIP="atbm6132u"
+
+# Ethernet PHY
+# EXP_ETH_PHY="rtl8201"

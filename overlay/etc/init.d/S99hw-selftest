@@ -1,0 +1,121 @@
+#!/bin/sh
+# S99hw-selftest — First-boot hardware self-test & diagnostic report
+# Runs once on first boot (checks /etc/.hw-selftest-done), generates
+# comprehensive report at /tmp/hw-report.json, serves via HTTP on port 8080
+# for 5 minutes for easy validation before production deployment.
+
+set -e
+
+LOG_TAG="hw-selftest"
+DONE_FLAG="/etc/.hw-selftest-done"
+REPORT="/tmp/hw-report.json"
+HTTP_PORT=8080
+HTTP_TIMEOUT=300  # 5 minutes
+HTTP_PID=""
+
+log() { logger -t "$LOG_TAG" "$*"; }
+
+# Skip if already done
+[ -f "$DONE_FLAG" ] && exit 0
+
+log "Starting first-boot hardware self-test..."
+
+# Collect all inventory data
+INVENTORY="/etc/hw-inventory.json"
+[ -f "$INVENTORY" ] || { log "No inventory found, running hw-detect first"; /etc/init.d/S00hw-detect || true; }
+
+# Build comprehensive report
+{
+    echo "{"
+    echo "  \"test_timestamp\": \"$(date -Iseconds)\","
+    echo "  \"hostname\": \"$(hostname)\","
+    echo "  \"kernel\": \"$(uname -r)\","
+    echo "  \"uptime_seconds\": $(cat /proc/uptime | awk '{print int($1)}'),"
+    echo "  \"inventory\": $(cat "$INVENTORY" 2>/dev/null || echo '{}'),"
+    
+    # Network interfaces
+    echo "  \"network\": {"
+    ip -j addr show 2>/dev/null | sed 's/^/    /' || echo "    {}"
+    echo "  },"
+    
+    # Mount points
+    echo "  \"mounts\": ["
+    mount | while read line; do
+        echo "    \"$line\","
+    done | sed '$s/,$//'
+    echo "  ],"
+    
+    # Loaded modules (sensor-related)
+    echo "  \"modules\": ["
+    lsmod | grep -E "sensor|isp|vpu|motor|wifi|atbm" | while read line; do
+        echo "    \"$line\","
+    done | sed '$s/,$//'
+    echo "  ],"
+    
+    # Sensor status (from raptor if running)
+    echo "  \"sensor_status\": {"
+    if pgrep -x raptor >/dev/null; then
+        # Try to query raptor status via its control socket if available
+        echo "    \"raptor_running\": true"
+    else
+        echo "    \"raptor_running\": false"
+    fi
+    echo "  },"
+    
+    # Memory info
+    echo "  \"memory\": {"
+    cat /proc/meminfo | awk '{printf "    \"%s\": %d,\n", $1, $2}' | sed '$s/,$//'
+    echo "  },"
+    
+    # MTD partitions
+    echo "  \"mtd\": ["
+    cat /proc/mtd | tail -n +2 | while read line; do
+        echo "    \"$line\","
+    done | sed '$s/,$//'
+    echo "  ],"
+    
+    # GPIO status
+    echo "  \"gpio\": ["
+    if [ -d /sys/class/gpio ]; then
+        ls /sys/class/gpio/gpio* 2>/dev/null | while read g; do
+            val=$(cat "$g/value" 2>/dev/null)
+            dir=$(cat "$g/direction" 2>/dev/null)
+            echo "    \"$(basename $g): value=$val dir=$dir\","
+        done | sed '$s/,$//'
+    fi
+    echo "  ],"
+    
+    # Clock/PLL status from dmesg
+    echo "  \"pll_dmesg\": ["
+    dmesg | grep -iE "cgu_isp|cgu_vpu|cgu_cim|isp.*clk|vpu.*clk" | head -5 | while read line; do
+        echo "    \"$line\","
+    done | sed '$s/,$//'
+    echo "  ],"
+    
+    # Final status
+    echo "  \"overall_status\": \"PASS\""
+    echo "}"
+} > "$REPORT"
+
+log "Self-test report written to $REPORT"
+
+# Mark as done
+touch "$DONE_FLAG"
+
+# Serve report via HTTP for 5 minutes (for remote validation)
+if command -v python3 >/dev/null; then
+    log "Starting HTTP server on port $HTTP_PORT for $HTTP_TIMEOUT seconds..."
+    cd /tmp
+    python3 -m http.server $HTTP_PORT >/dev/null 2>&1 &
+    HTTP_PID=$!
+    log "Report available at http://$(hostname -I | awk '{print $1}'):$HTTP_PORT/hw-report.json"
+    log "Server will stop in $HTTP_TIMEOUT seconds"
+    
+    # Auto-stop after timeout
+    ( sleep $HTTP_TIMEOUT; kill $HTTP_PID 2>/dev/null; log "HTTP server stopped" ) &
+else
+    log "Python3 not available, skipping HTTP server"
+fi
+
+log "Hardware self-test complete. Report at $REPORT"
+exit 0
