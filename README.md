@@ -62,7 +62,7 @@ scripts/
 frigate/
   config.example.yml     Ready-to-use Frigate 0.14+ / go2rtc / ONVIF PTZ config for both lenses
 firmware/                Partition reports + SHA256SUMS.txt (images are Release assets)
-.github/workflows-pending/  CI workflows, to be moved to .github/workflows (needs a token with `workflow` scope)
+.github/workflows/      CI: build both profiles on upstream master and check the image layout
 docs/                    Unbrick & flash guide, Frigate setup, dual-sensor architecture, U-Boot policy
 ```
 
