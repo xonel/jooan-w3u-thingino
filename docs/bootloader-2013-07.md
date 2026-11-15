@@ -2,9 +2,9 @@
 
 ## Summary
 
-The Jooan W3-U (Ingenic T23N, 8 MiB SPI NOR) **must use U-Boot `2013.07`** (`u-boot-lzo-with-spl.bin`, load header `0x80370000`, banner `Thingino U-Boot for Ingenic T23N SPL 2013.07`).
+The Jooan W3-U (Ingenic T23N, 8 MiB SPI NOR) is built here with **U-Boot `2013.07`** (`u-boot-lzo-with-spl.bin`, load header `0x80370000`, banner `Thingino U-Boot for Ingenic T23N SPL 2013.07`).
 
-Flashing Thingino's default mainline-based `2026.07` (`u-boot-with-tpl-lzma.bin`, load header `0x802a0000`, banner `U-Boot SPL 2026.10-rc1`) **bricks the Jooan W3-U** at SPL boot before serial/MMC/network initialization, requiring external SPI recovery (`CH341A` + SOIC-8 clip).
+One full flash of an image carrying the default `2026.07` bootloader (`u-boot-with-tpl-lzma.bin`, load header `0x802a0000`, banner `U-Boot SPL 2026.10-rc1`) was followed by a camera that no longer started. This is a single observation: the flash chip was later found faulty, so it does not prove that `2026.07` cannot boot this board. `2013.07` is pinned because it is the only bootloader seen booting this camera (#1642).
 
 ## Clean Upstream Fix (`patches/thingino-firmware/0001-uboot-allow-camera-defconfig-to-select-2013-07.patch`)
 

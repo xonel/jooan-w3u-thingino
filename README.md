@@ -1,19 +1,21 @@
-# Jooan W3-U — Dual-Sensor Thingino Firmware (Frigate Ready)
+# Jooan W3-U — Experimental Dual-Sensor Thingino Firmware
 
-Custom [Thingino](https://github.com/themactep/thingino-firmware) profiles, upstream-ready patches, and prebuilt **8 MiB** SPI NOR firmware images for the **Jooan W3-U** dual-lens IP camera (**Ingenic T23N**, wired Ethernet + AltoBeam ATBM6132U Wi-Fi + PTZ + two-way audio + MicroSD), exposing **both cameras simultaneously** (`ch0`/`ch1` + `ch2`/`ch3`) to **Frigate NVR** without proprietary OEM `*_double.ko` kernel blobs.
+Experimental [Thingino](https://github.com/themactep/thingino-firmware) profiles and patches aiming to stream **both lenses** of the **Jooan W3-U** (Ingenic T23N, wired Ethernet, ATBM6132U Wi-Fi, PTZ) at once (`ch0`/`ch1` + `ch2`/`ch3`), for use with Frigate, without OEM `*_double.ko` modules.
 
-## Prebuilt Firmware Images (`firmware/`)
+> **Status: not yet tested on a real camera.** The images build and pass offline inspection only. Read [`docs/status.md`](docs/status.md) before flashing: it lists what is verified, what is assumed, and what is known to be a placeholder.
 
-Jooan shipped two hardware sensor revisions of the W3-U on the same T23N PCB. **Both 8 MiB images are built and validated** from official `themactep/thingino-firmware` (`master+e923f27`, 2026-11-15) with **U-Boot `2013.07` pinned** (`0x80370000`, avoiding the `2026.07` SPL brick):
+## Prebuilt images
 
-| Hardware Revision | Sensors (I2C0) | 8 MiB SPI Image (`firmware/`) | SHA-256 |
-|-------------------|----------------|-------------------------------|---------|
-| **Dual SC2336P / SC2336** | `0x30` + `0x32` (`0x9b3a` / `0xcb3a` / `0x10`) | `thingino-jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u.bin` | `d2edff20…` |
-| **Dual CV2003** *(mid-2026+ batches)* | `0x35` + `0x36` (`0x2003`) | `thingino-jooan_w3u_t23n_cv2003_dual_eth+atbm6132u.bin` | `127478ae…` |
+Images are attached to the [GitHub Releases](https://github.com/xonel/jooan-w3u-thingino/releases), not stored in git. Built from `themactep/thingino-firmware` `master+e923f27` with U-Boot `2013.07`.
 
-> **Tip if unsure which sensor batch your W3-U has:** You only need to flash with your `CH341A` programmer **once**! Both images boot Linux, Ethernet (GPIO 64), Wi-Fi, WebUI, and SSH. Once booted, run `sinfo` over SSH to check the exact sensor ID — if your board uses the other variant, switch in 30 seconds over SSH with `scripts/extract-ota-parts.sh` + `sysupgrade` (never touching `mtd0` U-Boot, never reopening the camera). See [`docs/unbrick-and-flash.md`](docs/unbrick-and-flash.md).
+| Profile | Sensors expected (I2C0) | Maturity |
+|---------|-------------------------|----------|
+| `jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u` | `sc2336ps0` @ `0x30` + `sc2336ps1` @ `0x32` | Experimental, untested on hardware |
+| `jooan_w3u_t23n_cv2003_dual_eth+atbm6132u` | `cv2003s0` @ `0x35` + `cv2003s1` @ `0x36` | Speculative: no evidence yet that any W3-U carries CV2003; uses a placeholder IQ file (untuned image) |
 
-## RTSP Streams for Frigate NVR
+Which sensors a given W3-U carries must be read from the running camera (`sinfo`, `dmesg`) before choosing a dual profile. See [`docs/unbrick-and-flash.md`](docs/unbrick-and-flash.md).
+
+## Intended RTSP streams (once validated)
 
 | Camera / Lens | Stream | RTSP Endpoint | Resolution / FPS | Audio |
 |---------------|--------|---------------|------------------|-------|
@@ -29,7 +31,7 @@ Ready-to-paste Frigate + `go2rtc` + ONVIF PTZ configuration: [`frigate/config.ex
 - **SoC / RAM / Flash**: Ingenic T23N, 64 MiB RAM (`osmem=30M@0x0`, `rmem=34M@0x1e00000`), 8 MiB SPI NOR
 - **Ethernet**: 100 Mbit/s wired (`eth` enable GPIO `64`, `toggle: true`)
 - **Wi-Fi**: AltoBeam ATBM6132U USB (`wlan` power GPIO `6`, `toggle: true`)
-- **Dual Sensors**: `sensor_1` reset GPIO `18`, `sensor_2` reset GPIO `16`, MIPI switch GPIO `7`
+- **Dual Sensors (unverified, copied from the W8-U profile)**: `sensor_1` reset GPIO `18`, `sensor_2` reset GPIO `16`, MIPI switch GPIO `7`
 - **Lighting & IR-Cut**: IR 850nm GPIO `59`, White LED GPIO `60`, IR-Cut coil GPIOs `"50 49"`
 - **Audio / SD / Reset**: Speaker amp GPIO `63` (`active_low: true`), MMC CD GPIO `61`, Reset button GPIO `62`
 - **PTZ Motors**: Pan `"53 52 54 51"`, Tilt `"51 54 52 53"`, switch GPIO `17` (`4000×750` steps)
@@ -52,13 +54,15 @@ make build
 configs/cameras/         Official Thingino camera profiles (defconfig, raptor.config, thingino.json)
 patches/
   ingenic-sdk/           SC2336P family chip-id patch (0x9b3a / 0xcb3a / 0x10)
-  thingino-firmware/     U-Boot 2013.07 camera-override fix + T23 CV2003 IQ fallback
+  thingino-firmware/     U-Boot 2013.07 camera-override fix + CV2003 placeholder IQ (applied by apply-to-thingino.sh)
+  upstream-series/       Same changes as a 4-commit git format-patch series on themactep master
 scripts/
   apply-to-thingino.sh   Applies patches & profiles onto official themactep/thingino-firmware
   extract-ota-parts.sh   Extracts uImage + rootfs.squashfs from .bin for safe partial sysupgrade
 frigate/
   config.example.yml     Ready-to-use Frigate 0.14+ / go2rtc / ONVIF PTZ config for both lenses
-firmware/                Validated 8 MiB SPI NOR images + partition reports + SHA256SUMS.txt
+firmware/                Partition reports + SHA256SUMS.txt (images are Release assets)
+.github/workflows-pending/  CI workflows, to be moved to .github/workflows (needs a token with `workflow` scope)
 docs/                    Unbrick & flash guide, Frigate setup, dual-sensor architecture, U-Boot policy
 ```
 
@@ -68,5 +72,6 @@ docs/                    Unbrick & flash guide, Frigate setup, dual-sensor archi
 - [`docs/frigate.md`](docs/frigate.md) — Intégration des 2 objectifs + audio + PTZ ONVIF dans Frigate
 - [`docs/dual-sensor.md`](docs/dual-sensor.md) — Architecture ISP multi-capteur T23N & Raptor
 - [`docs/bootloader-2013-07.md`](docs/bootloader-2013-07.md) — Pourquoi U-Boot `2013.07` est indispensable sur la W3-U
+- [`docs/status.md`](docs/status.md) — Verified vs assumed, QEMU result, open questions
 - [`docs/validation.md`](docs/validation.md) — Rapport de validation binaire des images 8 Mio
 - [`docs/upstream-issue-draft.md`](docs/upstream-issue-draft.md) — Suivi upstream [`themactep/thingino-firmware#2022`](https://github.com/themactep/thingino-firmware/issues/2022) & [`#1642`](https://github.com/themactep/thingino-firmware/issues/1642)

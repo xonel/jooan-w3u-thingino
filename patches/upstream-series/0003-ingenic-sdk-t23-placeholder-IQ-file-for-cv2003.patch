@@ -1,0 +1,33 @@
+From e6236a75a80603f864023d2ee54375bb113e94f9 Mon Sep 17 00:00:00 2001
+From: xonel <xonel@github.com>
+Date: Sun, 15 Nov 2026 02:57:27 +0100
+Subject: [PATCH 3/4] ingenic-sdk: t23: placeholder IQ file for cv2003
+
+sensor-iq/t23 has no cv2003.bin although the s0/s1 drivers exist. Use
+gc2053.bin as an explicit placeholder for that one sensor so the profile
+builds; image tuning will be wrong until a real file is added.
+---
+ package/ingenic-sdk/ingenic-sdk.mk | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/package/ingenic-sdk/ingenic-sdk.mk b/package/ingenic-sdk/ingenic-sdk.mk
+index f0bde2a..2db5f4c 100644
+--- a/package/ingenic-sdk/ingenic-sdk.mk
++++ b/package/ingenic-sdk/ingenic-sdk.mk
+@@ -182,7 +182,12 @@ define INSTALL_SENSOR_BIN
+ 			if [ -n "$(SENSOR_ISP_FW)" ] && [ -f $$iqdir/$(SENSOR_ISP_FW)/$(2).bin ]; then \
+ 				iqdir=$$iqdir/$(SENSOR_ISP_FW); \
+ 			fi; \
+-			$(INSTALL) -D -m 0644 $$iqdir/$(2).bin \
++			iqsrc=$$iqdir/$(2).bin; \
++			if [ ! -f "$$iqsrc" ] && [ "$(SOC_FAMILY)" = "t23" ] && [ "$(2)" = "cv2003" ]; then \
++				echo "WARNING: no t23 IQ file for cv2003, using gc2053.bin as a placeholder (untuned image)"; \
++				iqsrc=$$iqdir/gc2053.bin; \
++			fi; \
++			$(INSTALL) -D -m 0644 "$$iqsrc" \
+ 				$(TARGET_DIR)/usr/share/sensor/$(3); \
+ 			if [ -f $$iqdir/$(2)-cust.bin ]; then \
+ 				$(INSTALL) -D -m 0644 $$iqdir/$(2)-cust.bin \
+-- 
+2.56.0
+

@@ -1,5 +1,7 @@
 # Intégration Frigate NVR (les 2 caméras de la Jooan W3-U)
 
+> Configuration cible, non testée : elle suppose que le profil dual fonctionne sur la caméra. Voir [`status.md`](status.md).
+
 Avec le firmware Thingino Dual-Sensor (Raptor Streaming System), le SoC Ingenic T23N expose **4 flux RTSP indépendants** (2 flux par capteur : 1 flux principal 1080p pour l'enregistrement et 1 sous-flux 360p léger pour la détection d'objets Frigate) :
 
 | Objectif / Capteur | Rôle | URL RTSP | Résolution / FPS | Audio |

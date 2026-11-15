@@ -1,5 +1,5 @@
 diff --git a/package/ingenic-sdk/ingenic-sdk.mk b/package/ingenic-sdk/ingenic-sdk.mk
-index f0bde2a..3e46ec9 100644
+index f0bde2a..2db5f4c 100644
 --- a/package/ingenic-sdk/ingenic-sdk.mk
 +++ b/package/ingenic-sdk/ingenic-sdk.mk
 @@ -182,7 +182,12 @@ define INSTALL_SENSOR_BIN
@@ -8,8 +8,8 @@ index f0bde2a..3e46ec9 100644
  			fi; \
 -			$(INSTALL) -D -m 0644 $$iqdir/$(2).bin \
 +			iqsrc=$$iqdir/$(2).bin; \
-+			if [ ! -f "$$iqsrc" ] && [ "$(SOC_FAMILY)" = "t23" ] && [ -f "$$iqdir/gc2053.bin" ]; then \
-+				echo "WARNING: $(2).bin missing in $$iqdir, falling back to gc2053.bin (SRGGB10 1080p)"; \
++			if [ ! -f "$$iqsrc" ] && [ "$(SOC_FAMILY)" = "t23" ] && [ "$(2)" = "cv2003" ]; then \
++				echo "WARNING: no t23 IQ file for cv2003, using gc2053.bin as a placeholder (untuned image)"; \
 +				iqsrc=$$iqdir/gc2053.bin; \
 +			fi; \
 +			$(INSTALL) -D -m 0644 "$$iqsrc" \

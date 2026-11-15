@@ -1,3 +1,4 @@
+# NON TESTÉ sur matériel : configuration cible, voir docs/status.md
 # Exemple de configuration Frigate NVR (0.14+) pour la Jooan W3-U sous Thingino Dual-Sensor
 # Remplace 192.168.1.241 et le mot de passe RTSP ("thingino" par défaut, à changer dans la WebUI Thingino)
 

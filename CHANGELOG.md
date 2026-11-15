@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+- README and docs now state that nothing is hardware-tested; added `docs/status.md` (verified vs assumed) and the QEMU run of the dual SC2336P image.
+- CV2003 profile marked speculative; its IQ fallback is restricted to `cv2003` instead of any T23 sensor.
+- Firmware images removed from git (Release assets only).
+- Obsolete failing workflows removed; new ones parked in `.github/workflows-pending/`.
+- Added `patches/upstream-series/` (4 clean commits on upstream master).
+- Flash guide rewritten: recover in single-sensor mode and identify the hardware first.
+
 ## [0.2.0] - 2026-11-15
 
 ### Added

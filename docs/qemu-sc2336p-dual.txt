@@ -1,0 +1,40 @@
+--- lsmod | grep -iE "isp|sensor"; ls /proc/jz/sensor/; cat /proc/jz/sensor/sensor*/name
+sensor_sc2336ps1_t23     7856  0 
+sensor_sc2336ps0_t23     7808  0 
+tx_isp_t23           1035024  2 sensor_sc2336ps1_t23,sensor_sc2336ps0_t23
+count    sensor0  sensor1
+sc2336p
+sc2336ps1
+--- dmesg | grep -iE "chip found|not an|stream on|sc2336|cv2003" | tail -12
+[   14.841361] probe ok ------->sc2336p
+[   14.915362] sc2336p chip found @ 0x30 (i2c0)
+[   15.265380] probe ok ------->sc2336ps1
+[   15.344462] sc2336ps1 chip found @ 0x32 (i2c0)
+[   15.350988] sc2336p stream on
+--- ps | grep -E "rvd|rsd|rod" | grep -v grep; free -m; ls /dev/shm
+  675 root      100m S    /usr/bin/rvd -c /etc/raptor.conf
+  754 root      2436 S    /usr/bin/rod -c /etc/raptor.conf
+  774 root     16184 S    /usr/bin/rsd -c /etc/raptor.conf
+              total        used        free      shared  buff/cache   available
+Mem:          25732       14280         956           0       10496           0
+-/+ buffers/cache:        14280       11452
+Swap:             0           0           0
+imp_deubg_shm            rss_osd_osd_0_uptime     rss_ring_s1_jpeg2
+onvif_subscription       rss_osd_osd_1_camera     rss_ring_s1_jpeg3
+rss_enc_main             rss_osd_osd_1_logo       rss_ring_s1_main
+rss_enc_s1_main          rss_osd_osd_1_privacy    rss_ring_s1_sub
+rss_enc_s1_sub           rss_osd_osd_1_timestamp  rss_ring_sub
+rss_enc_sub              rss_osd_osd_1_uptime     sem.imp_deubg_sem_toc
+rss_osd_osd_0_camera     rss_ring_audio           sem.imp_deubg_sem_tos
+rss_osd_osd_0_logo       rss_ring_jpeg0           sem.sub_mem_lock
+rss_osd_osd_0_privacy    rss_ring_jpeg1
+rss_osd_osd_0_timestamp  rss_ring_main
+--- logread | grep rvd | grep -iE "fatal|error|fail|pipeline ready|multi-sensor|resolution" | tail -15
+Nov 15 00:13:18 rvd[675]: [INFO ] rvd_pipeline.c:949: multi-sensor mode: 2 sensors
+Nov 15 00:13:19 rvd[675]: [INFO ] rvd_pipeline.c:1183: sensor resolution: 1920x1080
+Nov 15 00:13:19 rvd[675]: [INFO ] rvd_pipeline.c:1545: pipeline ready: 8 streams
+--- for r in main sub s1_main s1_sub; do echo $r $(timeout 40 ringdump $r -d -s -n 8 2>/dev/null | wc -c); done
+main 9504
+sub 2667
+s1_main 1978
+s1_sub 2288

@@ -1,0 +1,291 @@
+From d9f5c6b28ef6e25b474820b75ca4cc6dd6382fa2 Mon Sep 17 00:00:00 2001
+From: xonel <xonel@github.com>
+Date: Sun, 15 Nov 2026 02:57:27 +0100
+Subject: [PATCH 4/4] cameras: add experimental Jooan W3-U dual-sensor profiles
+
+Dual SC2336P and dual CV2003 variants, pinned to U-Boot 2013.07.
+Sensor reset GPIOs (18/16) and MIPI switch GPIO (7) are taken from the
+W8-U profile and are not yet confirmed on W3-U hardware.
+---
+ ...u_t23n_cv2003_dual_eth+atbm6132u_defconfig | 25 ++++++++++
+ .../prudynt.json                              | 13 ++++++
+ .../raptor.config                             | 17 +++++++
+ .../thingino.json                             | 46 +++++++++++++++++++
+ ..._t23n_sc2336p_dual_eth+atbm6132u_defconfig | 25 ++++++++++
+ .../prudynt.json                              | 13 ++++++
+ .../raptor.config                             | 17 +++++++
+ .../thingino.json                             | 46 +++++++++++++++++++
+ ...n_w3u_t23n_sc2336p_eth+atbm6132u_defconfig |  1 +
+ 9 files changed, 203 insertions(+)
+ create mode 100644 configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u_defconfig
+ create mode 100644 configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/prudynt.json
+ create mode 100644 configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/raptor.config
+ create mode 100644 configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/thingino.json
+ create mode 100644 configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u_defconfig
+ create mode 100644 configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/prudynt.json
+ create mode 100644 configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/raptor.config
+ create mode 100644 configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/thingino.json
+
+diff --git a/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u_defconfig b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u_defconfig
+new file mode 100644
+index 0000000..797d961
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u_defconfig
+@@ -0,0 +1,25 @@
++# NAME: Jooan W3-U (T23N, Dual CV2003, ETH, ATBM6132U)
++# FRAG: soc-xburst1 core
++BR2_ETHERNET=y
++BR2_INGENIC_SOC_MODEL="t23n"
++BR2_ISP_CLK_200MHZ=y
++BR2_ISP_DIRECT_MODE_0=y
++BR2_ISP_MEMOPT_0=y
++BR2_ISP_PARAMS="mipi_switch_gpio=7"
++BR2_PACKAGE_THINGINO_KOPT_MMC0=y
++BR2_PACKAGE_THINGINO_KOPT_MMC0_PB_4BIT=y
++BR2_PACKAGE_WIFI=y
++BR2_PACKAGE_WIFI_ATBM6132U=y
++BR2_SENSOR_1_NAME="cv2003s0"
++BR2_SENSOR_1_PARAMS="reset_gpio=18"
++BR2_SENSOR_2_NAME="cv2003s1"
++BR2_SENSOR_2_PARAMS="reset_gpio=16"
++BR2_THINGINO_AUDIO=y
++BR2_THINGINO_BUTTON=y
++BR2_THINGINO_IMAGE_SENSOR_QTY=2
++BR2_THINGINO_MOTORS=y
++BR2_THINGINO_PWM_ENABLE=y
++BR2_THINGINO_RMEM_MB=34
++BR2_THINGINO_SDCARD=y
++BR2_THINGINO_UBOOT_VERSION_2013_07=y
++FLASH_SIZE_MB=8
+diff --git a/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/prudynt.json b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/prudynt.json
+new file mode 100644
+index 0000000..44a6598
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/prudynt.json
+@@ -0,0 +1,13 @@
++{
++  "multi_sensor": {
++    "enabled": true,
++    "count": 2,
++    "mipi_switch_gpio": 7,
++    "sensors": {
++      "0": { "model": "cv2003s0", "gpio_reset": 18 },
++      "1": { "model": "cv2003s1", "gpio_reset": 16 }
++    }
++  },
++  "stream2": { "enabled": true, "video_enabled": true, "rtsp_endpoint": "ch2" },
++  "stream3": { "enabled": true, "video_enabled": true, "rtsp_endpoint": "ch3" }
++}
+diff --git a/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/raptor.config b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/raptor.config
+new file mode 100644
+index 0000000..190a5e7
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/raptor.config
+@@ -0,0 +1,17 @@
++RAPTOR_SENSOR0_NAME="cv2003"
++RAPTOR_SENSOR0_I2C_ADDR="0x35"
++RAPTOR_SENSOR0_WIDTH="1920"
++RAPTOR_SENSOR0_HEIGHT="1080"
++RAPTOR_SENSOR0_FPS="15"
++RAPTOR_SENSOR1_NAME="cv2003s1"
++RAPTOR_SENSOR1_I2C_ADDR="0x36"
++RAPTOR_SENSOR1_WIDTH="1920"
++RAPTOR_SENSOR1_HEIGHT="1080"
++RAPTOR_SENSOR1_FPS="15"
++RAPTOR_STREAM0_FPS="15"
++RAPTOR_STREAM1_FPS="15"
++RAPTOR_S1S0_FPS="15"
++RAPTOR_S1S1_FPS="15"
++RAPTOR_RTSP_ENDPOINT_S1_MAIN="ch2"
++RAPTOR_RTSP_ENDPOINT_S1_SUB="ch3"
++RAPTOR_OSD_ISP_OSD_TRUE=y
+diff --git a/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/thingino.json b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/thingino.json
+new file mode 100644
+index 0000000..cb9f85d
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_cv2003_dual_eth+atbm6132u/thingino.json
+@@ -0,0 +1,46 @@
++{
++  "gpio": {
++    "button_reset": 62,
++    "eth": {
++      "pin": 64,
++      "toggle": true
++    },
++    "ir850": 59,
++    "ircut": "50 49",
++    "mmc_cd": 61,
++    "sensor_1": 18,
++    "sensor_2": 16,
++    "sensor_switch": 7,
++    "speaker": {
++      "pin": 63,
++      "active_low": true
++    },
++    "white": 60,
++    "wlan": {
++      "pin": 6,
++      "toggle": true
++    }
++  },
++  "motors": {
++    "gpio_invert": false,
++    "gpio_pan": "53 52 54 51",
++    "gpio_switch": 17,
++    "gpio_tilt": "51 54 52 53",
++    "homing": true,
++    "invert_x": false,
++    "invert_y": false,
++    "is_spi": false,
++    "presets": [
++      {
++        "id": 0,
++        "x": 2000,
++        "y": 375,
++        "description": "Home"
++      }
++    ],
++    "speed_pan": 900,
++    "speed_tilt": 900,
++    "steps_pan": 4000,
++    "steps_tilt": 750
++  }
++}
+diff --git a/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u_defconfig b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u_defconfig
+new file mode 100644
+index 0000000..0043d66
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u_defconfig
+@@ -0,0 +1,25 @@
++# NAME: Jooan W3-U (T23N, Dual SC2336P, ETH, ATBM6132U)
++# FRAG: soc-xburst1 core
++BR2_ETHERNET=y
++BR2_INGENIC_SOC_MODEL="t23n"
++BR2_ISP_CLK_200MHZ=y
++BR2_ISP_DIRECT_MODE_0=y
++BR2_ISP_MEMOPT_0=y
++BR2_ISP_PARAMS="mipi_switch_gpio=7"
++BR2_PACKAGE_THINGINO_KOPT_MMC0=y
++BR2_PACKAGE_THINGINO_KOPT_MMC0_PB_4BIT=y
++BR2_PACKAGE_WIFI=y
++BR2_PACKAGE_WIFI_ATBM6132U=y
++BR2_SENSOR_1_NAME="sc2336ps0"
++BR2_SENSOR_1_PARAMS="reset_gpio=18"
++BR2_SENSOR_2_NAME="sc2336ps1"
++BR2_SENSOR_2_PARAMS="reset_gpio=16"
++BR2_THINGINO_AUDIO=y
++BR2_THINGINO_BUTTON=y
++BR2_THINGINO_IMAGE_SENSOR_QTY=2
++BR2_THINGINO_MOTORS=y
++BR2_THINGINO_PWM_ENABLE=y
++BR2_THINGINO_RMEM_MB=34
++BR2_THINGINO_SDCARD=y
++BR2_THINGINO_UBOOT_VERSION_2013_07=y
++FLASH_SIZE_MB=8
+diff --git a/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/prudynt.json b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/prudynt.json
+new file mode 100644
+index 0000000..0b2297f
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/prudynt.json
+@@ -0,0 +1,13 @@
++{
++  "multi_sensor": {
++    "enabled": true,
++    "count": 2,
++    "mipi_switch_gpio": 7,
++    "sensors": {
++      "0": { "model": "sc2336ps0", "gpio_reset": 18 },
++      "1": { "model": "sc2336ps1", "gpio_reset": 16 }
++    }
++  },
++  "stream2": { "enabled": true, "video_enabled": true, "rtsp_endpoint": "ch2" },
++  "stream3": { "enabled": true, "video_enabled": true, "rtsp_endpoint": "ch3" }
++}
+diff --git a/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/raptor.config b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/raptor.config
+new file mode 100644
+index 0000000..00f03f4
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/raptor.config
+@@ -0,0 +1,17 @@
++RAPTOR_SENSOR0_NAME="sc2336p"
++RAPTOR_SENSOR0_I2C_ADDR="0x30"
++RAPTOR_SENSOR0_WIDTH="1920"
++RAPTOR_SENSOR0_HEIGHT="1080"
++RAPTOR_SENSOR0_FPS="15"
++RAPTOR_SENSOR1_NAME="sc2336ps1"
++RAPTOR_SENSOR1_I2C_ADDR="0x32"
++RAPTOR_SENSOR1_WIDTH="1920"
++RAPTOR_SENSOR1_HEIGHT="1080"
++RAPTOR_SENSOR1_FPS="15"
++RAPTOR_STREAM0_FPS="15"
++RAPTOR_STREAM1_FPS="15"
++RAPTOR_S1S0_FPS="15"
++RAPTOR_S1S1_FPS="15"
++RAPTOR_RTSP_ENDPOINT_S1_MAIN="ch2"
++RAPTOR_RTSP_ENDPOINT_S1_SUB="ch3"
++RAPTOR_OSD_ISP_OSD_TRUE=y
+diff --git a/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/thingino.json b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/thingino.json
+new file mode 100644
+index 0000000..cb9f85d
+--- /dev/null
++++ b/configs/cameras/jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u/thingino.json
+@@ -0,0 +1,46 @@
++{
++  "gpio": {
++    "button_reset": 62,
++    "eth": {
++      "pin": 64,
++      "toggle": true
++    },
++    "ir850": 59,
++    "ircut": "50 49",
++    "mmc_cd": 61,
++    "sensor_1": 18,
++    "sensor_2": 16,
++    "sensor_switch": 7,
++    "speaker": {
++      "pin": 63,
++      "active_low": true
++    },
++    "white": 60,
++    "wlan": {
++      "pin": 6,
++      "toggle": true
++    }
++  },
++  "motors": {
++    "gpio_invert": false,
++    "gpio_pan": "53 52 54 51",
++    "gpio_switch": 17,
++    "gpio_tilt": "51 54 52 53",
++    "homing": true,
++    "invert_x": false,
++    "invert_y": false,
++    "is_spi": false,
++    "presets": [
++      {
++        "id": 0,
++        "x": 2000,
++        "y": 375,
++        "description": "Home"
++      }
++    ],
++    "speed_pan": 900,
++    "speed_tilt": 900,
++    "steps_pan": 4000,
++    "steps_tilt": 750
++  }
++}
+diff --git a/configs/cameras/jooan_w3u_t23n_sc2336p_eth+atbm6132u/jooan_w3u_t23n_sc2336p_eth+atbm6132u_defconfig b/configs/cameras/jooan_w3u_t23n_sc2336p_eth+atbm6132u/jooan_w3u_t23n_sc2336p_eth+atbm6132u_defconfig
+index 54c1184..9c525cc 100644
+--- a/configs/cameras/jooan_w3u_t23n_sc2336p_eth+atbm6132u/jooan_w3u_t23n_sc2336p_eth+atbm6132u_defconfig
++++ b/configs/cameras/jooan_w3u_t23n_sc2336p_eth+atbm6132u/jooan_w3u_t23n_sc2336p_eth+atbm6132u_defconfig
+@@ -12,4 +12,5 @@ BR2_THINGINO_AUDIO=y
+ BR2_THINGINO_BUTTON=y
+ BR2_THINGINO_MOTORS=y
+ BR2_THINGINO_SDCARD=y
++BR2_THINGINO_UBOOT_VERSION_2013_07=y
+ FLASH_SIZE_MB=8
+-- 
+2.56.0
+

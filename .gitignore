@@ -10,3 +10,5 @@ backup-cam242/
 
 # Editors / OS
 .DS_Store
+# Firmware images are published as GitHub Release assets, not in git
+firmware/*.bin

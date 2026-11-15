@@ -2,9 +2,9 @@
 
 The Jooan W3-U is a dual-lens IP camera (fixed wide-angle lens + Pan/Tilt lens) powered by an **Ingenic T23N** (64 MiB DDR2, 8 MiB SPI NOR, wired 100M Ethernet via GPIO 64 toggle, AltoBeam ATBM6132U USB Wi-Fi).
 
-Depending on manufacturing batch, Jooan shipped **two sensor variants** on the same board:
+Two sensor configurations are provided as profiles. Which one a given W3-U carries has not been confirmed on hardware:
 1. **Dual SmartSens SC2336P / SC2336** (`0x30` + `0x32` on I2C0; chip ID `0x9b3a`, `0xcb3a`, or classic `0x10`)
-2. **Dual CVSens CV2003** (`0x35` + `0x36` on I2C0; chip ID `0x2003`, mid-2026 batches)
+2. **Dual CVSens CV2003** (`0x35` + `0x36` on I2C0; chip ID `0x2003`; speculative for the W3-U)
 
 ## How Dual-Sensor Works on Official Thingino
 

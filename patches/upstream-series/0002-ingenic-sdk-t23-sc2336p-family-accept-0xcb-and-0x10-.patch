@@ -1,0 +1,88 @@
+From b165a709dbce9e6c803d09862c9e3f27fdbc3135 Mon Sep 17 00:00:00 2001
+From: xonel <xonel@github.com>
+Date: Sun, 15 Nov 2026 02:57:27 +0100
+Subject: [PATCH 2/4] ingenic-sdk: t23 sc2336p family: accept 0xcb and 0x10
+ chip id high bytes
+
+Untested on hardware; see issue #2022.
+---
+ ...-sc2336p-accept-classic-chip-id-0x10.patch | 67 +++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 package/all-patches/ingenic-sdk/0001-sc2336p-accept-classic-chip-id-0x10.patch
+
+diff --git a/package/all-patches/ingenic-sdk/0001-sc2336p-accept-classic-chip-id-0x10.patch b/package/all-patches/ingenic-sdk/0001-sc2336p-accept-classic-chip-id-0x10.patch
+new file mode 100644
+index 0000000..5ce9c44
+--- /dev/null
++++ b/package/all-patches/ingenic-sdk/0001-sc2336p-accept-classic-chip-id-0x10.patch
+@@ -0,0 +1,67 @@
++Subject: [PATCH] sc2336p family (t23): accept SC2336 (0xcb3a) and classic 0x10 chip IDs
++
++Jooan W3-U dual-lens boards ship SC2336-family sensors that report either
++classic SC2336/SC223A high byte 0x10 or standard SC2336 0xcb3a instead of
++SC2336P 0x9b3a. Accept 0x9b, 0xcb, and 0x10 in sc2336p, sc2336ps0, and
++sc2336ps1 so all variants probe cleanly.
++---
++--- a/3.10.14/sensor-src/t23/sc2336p.c
+++++ b/3.10.14/sensor-src/t23/sc2336p.c
++@@ -1016,7 +1016,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	if (ret < 0)
++ 		return ret;
++ 
++-	if (v != SENSOR_CHIP_ID_H)
+++	if (v != SENSOR_CHIP_ID_H && v != 0xcb && v != 0x10)
++ 		return -ENODEV;
++ 
++ 	*ident = v;
++@@ -1026,7 +1026,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	if (ret < 0)
++ 		return ret;
++ 
++-	if (v != SENSOR_CHIP_ID_L)
+++	if (*ident != 0x10 && v != SENSOR_CHIP_ID_L)
++ 		return -ENODEV;
++ 
++ 	*ident = (*ident << 8) | v;
++--- a/3.10.14/sensor-src/t23/sc2336ps0.c
+++++ b/3.10.14/sensor-src/t23/sc2336ps0.c
++@@ -616,7 +616,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	ISP_WARNING("-----%s: %d ret = %d, v = 0x%02x\n", __func__, __LINE__, ret,v);
++ 	if (ret < 0)
++ 		return ret;
++-	if (v != SENSOR_CHIP_ID_H)
+++	if (v != SENSOR_CHIP_ID_H && v != 0xcb && v != 0x10)
++ 		return -ENODEV;
++ 	*ident = v;
++ 
++@@ -624,7 +624,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	ISP_WARNING("-----%s: %d ret = %d, v = 0x%02x\n", __func__, __LINE__, ret,v);
++ 	if (ret < 0)
++ 		return ret;
++-	if (v != SENSOR_CHIP_ID_L)
+++	if (*ident != 0x10 && v != SENSOR_CHIP_ID_L)
++ 		return -ENODEV;
++ 	*ident = (*ident << 8) | v;
++ 
++--- a/3.10.14/sensor-src/t23/sc2336ps1.c
+++++ b/3.10.14/sensor-src/t23/sc2336ps1.c
++@@ -620,7 +620,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	ISP_WARNING("-----%s: %d ret = %d, v = 0x%02x\n", __func__, __LINE__, ret,v);
++ 	if (ret < 0)
++ 		return ret;
++-	if (v != SENSOR_CHIP_ID_H)
+++	if (v != SENSOR_CHIP_ID_H && v != 0xcb && v != 0x10)
++ 		return -ENODEV;
++ 	*ident = v;
++ 
++@@ -628,7 +628,7 @@ static int sensor_detect(struct tx_isp_subdev *sd, unsigned int *ident)
++ 	ISP_WARNING("-----%s: %d ret = %d, v = 0x%02x\n", __func__, __LINE__, ret,v);
++ 	if (ret < 0)
++ 		return ret;
++-	if (v != SENSOR_CHIP_ID_L)
+++	if (*ident != 0x10 && v != SENSOR_CHIP_ID_L)
++ 		return -ENODEV;
++ 	*ident = (*ident << 8) | v;
++ 
+-- 
+2.56.0
+
