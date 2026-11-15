@@ -69,3 +69,4 @@ docs/                    Unbrick & flash guide, Frigate setup, dual-sensor archi
 - [`docs/dual-sensor.md`](docs/dual-sensor.md) — Architecture ISP multi-capteur T23N & Raptor
 - [`docs/bootloader-2013-07.md`](docs/bootloader-2013-07.md) — Pourquoi U-Boot `2013.07` est indispensable sur la W3-U
 - [`docs/validation.md`](docs/validation.md) — Rapport de validation binaire des images 8 Mio
+- [`docs/upstream-issue-draft.md`](docs/upstream-issue-draft.md) — Suivi upstream [`themactep/thingino-firmware#2022`](https://github.com/themactep/thingino-firmware/issues/2022) & [`#1642`](https://github.com/themactep/thingino-firmware/issues/1642)
