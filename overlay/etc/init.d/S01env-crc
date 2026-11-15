@@ -1,5 +1,0 @@
-#!/bin/sh
-# S01env-crc — Verify U-Boot environment integrity at early boot
-# Runs before network/services, restores from backup if needed.
-
-. /usr/sbin/env-crc

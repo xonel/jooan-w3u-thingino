@@ -1,49 +1,23 @@
 # Changelog
 
-All notable changes to this firmware will be documented in this file.
+All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
+## [0.2.0] - 2026-11-15
 
 ### Added
-- Hardware validation suite (flash/RAM/MAC/sensor/PHY/motor detection)
-- Sensor IQ auto-selection based on ISP firmware version
-- First-boot self-test with HTTP report server
-- Motor driver auto-detection (WQ9001 SPI vs GPIO)
-- Kernel config fragment for hardware validation
-- Sensor auto-detection (S10sensor-detect + sensor.map)
-- Dynamic raptor.conf generation from detected sensors
-- Sysupgrade guard blocking bootloader flashes
-- Env CRC verification with auto-restore from backup
-- Hardware watchdog (Ingenic T23 WDT)
-- Recovery partition with minimal shell
-- U-Boot 2013.07 pin for T23N (prevents 2026.07 brick)
-- Dual-sensor support via Ingenic double-ISP firmware
-- Sensor chip-id 0x10 acceptance patch for SC2336P family
+- Rebased cleanly onto official upstream `themactep/thingino-firmware` (`master` Nov 2026) with `thingino-raptor-config` (`raptor.config`).
+- Added **Dual CV2003** profile (`jooan_w3u_t23n_cv2003_dual_eth+atbm6132u`, `cv2003s0` @ `0x35` + `cv2003s1` @ `0x36`, SRGGB10 IQ fallback) alongside **Dual SC2336P** (`jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u`, `0x30` + `0x32`).
+- Extended SC2336P patch to accept `0x9b3a` (SC2336P), `0xcb3a` (SC2336), and `0x10` (classic SC2336).
+- Explicit `RAPTOR_SENSOR0_WIDTH/HEIGHT=1920x1080` and `RAPTOR_SENSOR1_WIDTH/HEIGHT=1920x1080` in `raptor.config` so `rvd` multi-sensor crop & sub-stream scaler initialize cleanly.
+- Explicit `reset_gpio=18` (`sensor_1`), `reset_gpio=16` (`sensor_2`), and `mipi_switch_gpio=7`.
+- Added `scripts/apply-to-thingino.sh` to apply patches & profiles onto any clean `themactep/thingino-firmware` checkout.
+- Added ready-to-use **Frigate NVR + go2rtc** configuration (`frigate/config.example.yml`, `docs/frigate.md`) and CH341A unbrick/OTA switch guide (`docs/unbrick-and-flash.md`).
+- Fixed GitHub Actions workflows (`build-validate.yml`, `release.yml`) to clone `themactep/thingino-firmware`, apply patches, build in `thingino-builder-image`, and validate SPL/uImage/SquashFS magics.
 
-### Security
-- Sysupgrade guard prevents accidental bootloader flash (issue #386)
-- Env CRC with auto-restore from backup partition
-- Hardware watchdog prevents freeze-induced bricks
-- Recovery partition accessible via GPIO button hold
+### Removed
+- Removed broken custom `gen-raptor-conf` / `S10sensor-detect` overlay scripts and invalid Buildroot Kconfig symbols that conflicted with upstream Thingino & Raptor INI configuration.
 
 ## [0.1.0] - 2026-09-19
 
 ### Added
-- Initial Jooan W3-U T23N dual-sensor firmware
-- Single-sensor (unique) and dual-sensor profiles
-- SC2336P sensor chip-id 0x10 acceptance
-- U-Boot 2013.07 pin for T23N (bootable)
-- Multi-sensor auto-detection via I2C scan
-- Dynamic raptor.conf generation
-- Sensor diagnostics (sinfo + S99sensor-diag) in data overlay
-- GitHub Actions CI with QEMU boot test
-
-### Fixed
-- U-Boot 2026.07 brick on T23N (pinned to 2013.07)
-
-### Security
-- Part-only sysupgrade deployment policy
-- Environment CRC with backup auto-restore
+- Initial Jooan W3-U T23N dual-sensor SC2336P exploration, U-Boot 2013.07 pin, and chip-id `0x10` patch.

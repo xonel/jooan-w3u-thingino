@@ -1,75 +1,25 @@
-# Dual sensor without closed-source drivers
+# Dual-Sensor Architecture on Jooan W3-U (T23N)
 
-The Jooan W3-U ships two SC2336P lenses. Stock Thingino runs one lenses per
-board; OEM firmware uses proprietary kernel modules (`tx_isp_t23_double`,
-`sensor_*_t23_double.ko`) that are not acceptable here. This project achieves
-both lenses with open-source code only.
+The Jooan W3-U is a dual-lens IP camera (fixed wide-angle lens + Pan/Tilt lens) powered by an **Ingenic T23N** (64 MiB DDR2, 8 MiB SPI NOR, wired 100M Ethernet via GPIO 64 toggle, AltoBeam ATBM6132U USB Wi-Fi).
 
-## How it works
+Depending on manufacturing batch, Jooan shipped **two sensor variants** on the same board:
+1. **Dual SmartSens SC2336P / SC2336** (`0x30` + `0x32` on I2C0; chip ID `0x9b3a`, `0xcb3a`, or classic `0x10`)
+2. **Dual CVSens CV2003** (`0x35` + `0x36` on I2C0; chip ID `0x2003`, mid-2026 batches)
 
-Ingenic's vendor SDK ships a **double-ISP firmware** for the T23 family:
+## How Dual-Sensor Works on Official Thingino
 
-```
-sdk/t23/1.3.0-double/libt23-firmware.a
-```
-
-The Thingino build links that double firmware when **`CONFIG_MULTI_SENSOR`** is
-defined:
-
-```
-isp/t23/Kbuild:9-11  →  link libt23-firmware.a from the -double SDK tree
-```
-
-That activates the T23's dual-channel ISP (S1S0 + S1S1 image capture), the same
-hardware path the vendor's closed `tx_isp_t23_double.ko` uses — without the blob.
-
-## Sensor map
-
-Two sensor profiles are exposed, one per I2C address:
-
-| Address | Sensor model | Role |
-|---------|--------------|------|
-| `0x30` | `sc2336ps0` | sensor0 (main lens, RTSP ch0/ch1) |
-| `0x32` | `sc2336ps1` | sensor1 (secondary lens, RTSP ch2/ch3) |
-
-Both are variants of the SC2336 driver. **Chip-id caveat**: both lenses report the
-classic SC2336 family id `0x10`, which the stock drivers reject
-(`"chip found @ 0x30 is not an sc2336p chip"`). The patch in
-[`patches/0001-sc2336p-accept-classic-chip-id-0x10.patch`](../patches) makes the
-`sc2336p` / `sc2336ps0` / `sc2336ps1` drivers accept `v == 0x10`.
-
-## Memory split
-
-Two ISP instances need two reserved memory areas. The dual profile uses:
-
-- `osmem=30M@0x0` — 30 Mio for the kernel/userspace
-- `rmem=34M@0x1e00000` — 34 Mio for the two ISP image pipelines
-
-```text
-RAM 64M:  [0x0 .. 30M)   osmem        (linux)
-          [30M .. 64M)   rmem @0x1e00000 (dual ISP)
-```
-
-## Raptor / streamer setup
-
-The dual profile routes the streamer's S1 output to dedicated RTSP endpoints:
-
-- sensor0 → main (ch0) / sub (ch1)
-- sensor1 → **ch2** / **ch3** (via `raptor` S1 main/sub endpoints)
-- 15 fps for both sensors and both streams
-
-Selector entries in the profile defconfig:
-
-```
-RAPTOR_CONF_SENSOR0_I2C_ADDR="0x30"   RAPTOR_CONF_SENSOR0_NAME="sc2336ps0"
-RAPTOR_CONF_SENSOR1_I2C_ADDR="0x32"   RAPTOR_CONF_SENSOR1_NAME="sc2336ps1"
-RAPTOR_CONF_S1S0_FPS="15"             RAPTOR_CONF_S1S1_FPS="15"
-RAPTOR_CONF_RTSP_ENDPOINT_S1_MAIN="ch2"
-RAPTOR_CONF_RTSP_ENDPOINT_S1_SUB="ch3"
-```
-
-## Reference
-
-The upstream **W8-U** (T31 or T23 class) profile carries the same dual wiring
-(`QTY=2`, `RMEM_MB=34`, PWM + motors, double ISP config); the dual profile here
-follows that recipe for the T23N with the SC2336P family.
+When `BR2_THINGINO_IMAGE_SENSOR_QTY=2` is set in the camera defconfig:
+1. **`ingenic-sdk`** compiles with `CONFIG_MULTI_SENSOR=1`, linking Ingenic's dual-sensor T23 ISP library (`libt23-firmware.a` multi-sensor build) into `tx-isp-t23.ko` (`mipi_switch_gpio=7`, `direct_mode=0`, `isp_memopt=0`, `isp_clk=200000000`) and building both synchronized (`s0`/`s1`) sensor modules:
+   - SC2336P profile: `sensor_sc2336ps0_t23.ko` (`reset_gpio=18`) + `sensor_sc2336ps1_t23.ko` (`reset_gpio=16`)
+   - CV2003 profile: `sensor_cv2003s0_t23.ko` (`reset_gpio=18`) + `sensor_cv2003s1_t23.ko` (`reset_gpio=16`)
+2. **Memory split (`64 MiB` total)**:
+   - `osmem=30M@0x0` (Linux kernel + userspace)
+   - `rmem=34M@0x1e00000` (Dual ISP + H.264 encoder ring buffers)
+3. **Raptor Streaming System (`raptor.config` → `/etc/raptor.conf`)**:
+   - Explicitly declares `width = 1920` and `height = 1080` on `[sensor0]` and `[sensor1]` (required because `s0`/`s1` drivers report `0x0` in `/proc/jz/sensor` prior to stream crop/scaler setup in `rvd_pipeline.c`).
+   - Uses hardware ISP OSD (`isp_osd = true`) for zero extra DDR bandwidth.
+   - Exposes **4 concurrent H.264 RTSP streams** on port `554` for Frigate NVR:
+     - `/ch0` — Sensor 0 Main (`1920x1080 @ 15 fps` + AAC audio + 2-way backchannel)
+     - `/ch1` — Sensor 0 Sub (`640x360 @ 15 fps` for Frigate object detection)
+     - `/ch2` — Sensor 1 Main (`1920x1080 @ 15 fps`)
+     - `/ch3` — Sensor 1 Sub (`640x360 @ 15 fps` for Frigate object detection)

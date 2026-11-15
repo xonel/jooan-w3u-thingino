@@ -1,0 +1,25 @@
+diff --git a/Makefile b/Makefile
+index 86f2148..7d2b4a9 100644
+--- a/Makefile
++++ b/Makefile
+@@ -208,8 +208,8 @@ TOOLCHAIN_TYPE_TAG := $(if $(filter BUILDROOT,$(TOOLCHAIN_TYPE_RAW)),br,$(if $(f
+ TOOLCHAIN_LIBC_TAG := $(shell echo "$(TOOLCHAIN_LIBC_RAW)" | tr 'A-Z' 'a-z')
+ TOOLCHAIN_FRAGMENT_FILE := configs/fragments/toolchain/$(TOOLCHAIN_TYPE_TAG)-gcc$(TOOLCHAIN_GCC_RAW)-$(TOOLCHAIN_LIBC_TAG).fragment
+ 
+-# Resolve U-Boot version fragment
+-THINGINO_UBOOT_VERSION_RAW := $(if $(CAMERA_CONFIG_REAL),$(strip $(shell grep -h '^BR2_THINGINO_UBOOT_VERSION_' $(EARLY_TOOLCHAIN_INPUT_FILES) 2>/dev/null | grep '=y$$' | head -1 | sed 's/.*UBOOT_VERSION_\(.*\)=y/\1/')))
++# Resolve U-Boot version fragment (last match wins so camera defconfig / local.fragment overrides core.fragment)
++THINGINO_UBOOT_VERSION_RAW := $(if $(CAMERA_CONFIG_REAL),$(strip $(shell grep -h '^BR2_THINGINO_UBOOT_VERSION_' $(EARLY_TOOLCHAIN_INPUT_FILES) 2>/dev/null | grep '=y$$' | tail -1 | sed 's/.*UBOOT_VERSION_\(.*\)=y/\1/')))
+ THINGINO_UBOOT_VERSION_RAW := $(if $(THINGINO_UBOOT_VERSION_RAW),$(THINGINO_UBOOT_VERSION_RAW),2026_07)
+ THINGINO_UBOOT_VERSION_TAG := $(if $(filter 2026_07,$(THINGINO_UBOOT_VERSION_RAW)),2026-07,$(if $(filter 2026_04,$(THINGINO_UBOOT_VERSION_RAW)),2026-04,$(if $(filter 2013_07,$(THINGINO_UBOOT_VERSION_RAW)),2013-07,$(if $(filter CUSTOM_FORK,$(THINGINO_UBOOT_VERSION_RAW)),custom-fork,$(shell echo "$(THINGINO_UBOOT_VERSION_RAW)" | tr 'A-Z' 'a-z' | tr '_' '-')))))
+ THINGINO_UBOOT_FRAGMENT_FILE := configs/fragments/uboot/v$(THINGINO_UBOOT_VERSION_TAG).fragment
+diff --git a/configs/fragments/uboot/v2013-07.fragment b/configs/fragments/uboot/v2013-07.fragment
+index d478611..d2b3af7 100644
+--- a/configs/fragments/uboot/v2013-07.fragment
++++ b/configs/fragments/uboot/v2013-07.fragment
+@@ -1,3 +1,5 @@
++BR2_THINGINO_UBOOT_VERSION_2013_07=y
++# BR2_THINGINO_UBOOT_VERSION_2026_07 is not set
+ BR2_TARGET_UBOOT_CUSTOM_VERSION=y
+ BR2_TARGET_UBOOT_CUSTOM_VERSION_VALUE="2013.07"
+ BR2_TARGET_UBOOT_BUILD_SYSTEM_LEGACY=y

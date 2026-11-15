@@ -1,0 +1,71 @@
+# Exemple de configuration Frigate NVR (0.14+) pour la Jooan W3-U sous Thingino Dual-Sensor
+# Remplace 192.168.1.241 et le mot de passe RTSP ("thingino" par défaut, à changer dans la WebUI Thingino)
+
+go2rtc:
+  streams:
+    # --- Objectif 1 (Capteur 0 : ch0 = 1080p 15fps + audio AAC/backchannel, ch1 = 640x360 15fps) ---
+    jooan_w3u_cam1_main:
+      - rtsp://thingino:thingino@192.168.1.241:554/ch0
+      - ffmpeg:jooan_w3u_cam1_main#audio=opus
+    jooan_w3u_cam1_sub:
+      - rtsp://thingino:thingino@192.168.1.241:554/ch1
+
+    # --- Objectif 2 (Capteur 1 : ch2 = 1080p 15fps, ch3 = 640x360 15fps) ---
+    jooan_w3u_cam2_main:
+      - rtsp://thingino:thingino@192.168.1.241:554/ch2
+    jooan_w3u_cam2_sub:
+      - rtsp://thingino:thingino@192.168.1.241:554/ch3
+
+cameras:
+  jooan_w3u_haut:
+    enabled: true
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-aac
+      inputs:
+        - path: rtsp://127.0.0.1:8554/jooan_w3u_cam1_main?mp4
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+            - audio
+        - path: rtsp://127.0.0.1:8554/jooan_w3u_cam1_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    record:
+      enabled: true
+    snapshots:
+      enabled: true
+    # Contrôle PTZ ONVIF intégré à Thingino (à attacher à l'objectif motorisé)
+    onvif:
+      host: 192.168.1.241
+      port: 80
+      user: root
+      password: root
+
+  jooan_w3u_bas:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/jooan_w3u_cam2_main
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/jooan_w3u_cam2_sub
+          input_args: preset-rtsp-restream
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 360
+      fps: 5
+    record:
+      enabled: true
+    snapshots:
+      enabled: true

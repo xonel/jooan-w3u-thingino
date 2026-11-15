@@ -1,0 +1,72 @@
+name: Build & Validate Firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u
+          - jooan_w3u_t23n_cv2003_dual_eth+atbm6132u
+    steps:
+      - name: Checkout jooan-w3u-thingino
+        uses: actions/checkout@v4
+        with:
+          path: w3u
+
+      - name: Clone official themactep/thingino-firmware
+        run: |
+          git clone --depth 1 https://github.com/themactep/thingino-firmware.git thingino
+          git -C thingino submodule update --init --depth 1
+          ./w3u/scripts/apply-to-thingino.sh "$PWD/thingino"
+
+      - name: Prepare Thingino download cache container
+        run: |
+          docker pull ghcr.io/themactep/thingino-dl:latest
+          docker create --name thingino-dl-cache ghcr.io/themactep/thingino-dl:latest /bin/true
+
+      - name: Build firmware in Thingino builder container
+        run: |
+          mkdir -p "$PWD/ccache"
+          docker run --rm --user "$(id -u):$(id -g)" --network=host \
+            --volumes-from thingino-dl-cache \
+            -v "$PWD/thingino":/workspace \
+            -v "$PWD/thingino/overrides":/overrides \
+            -v "$PWD/ccache":/home/ubuntu/.buildroot-ccache \
+            -w /workspace -e BR2_DL_DIR=/dl \
+            ghcr.io/themactep/thingino-builder-image:latest \
+            bash -c "sudo update-alternatives --install /usr/bin/install install /usr/bin/gnuinstall 100 2>/dev/null || true; WORKFLOW=1 PRISTINE=1 make CAMERA=${{ matrix.profile }} defconfig build_fast pack"
+
+      - name: Validate 8 MiB image & U-Boot 2013.07
+        run: |
+          IMG_DIR="thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images"
+          BIN="$IMG_DIR/thingino-${{ matrix.profile }}.bin"
+          test "$(stat -c%s "$BIN")" -eq 8388608
+          xxd -l 4 "$BIN" | grep -q "0605 0403"
+          xxd -s 12 -l 2 "$BIN" | grep -q "8037"
+          dd if="$BIN" bs=1 count=327680 2>/dev/null | strings | grep -q "SPL 2013.07"
+          xxd -s 0x70000 -l 4 "$BIN" | grep -q "2705 1956"
+          xxd -s 0x200000 -l 4 "$BIN" | grep -q "6873 7173"
+          sha256sum "$BIN" "$IMG_DIR/uImage" "$IMG_DIR/rootfs.squashfs" > "$IMG_DIR/SHA256SUMS.txt"
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.profile }}
+          path: |
+            thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images/thingino-*.bin
+            thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images/uImage
+            thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images/rootfs.squashfs
+            thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images/*.md
+            thingino/output/master/${{ matrix.profile }}-3.10.14-uclibc/images/SHA256SUMS.txt
+          retention-days: 30

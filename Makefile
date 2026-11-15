@@ -1,84 +1,110 @@
-# Makefile — Firmware build, test, release targets
+# Makefile — Build, validate & package Jooan W3-U dual-sensor Thingino firmwares
+# Uses official upstream https://github.com/themactep/thingino-firmware
 
 VERSION := $(shell cat VERSION)
 TAG := v$(VERSION)
 
-.PHONY: help version version-next version-major version-minor version-patch \
-        build build-unique build-dual test release clean
+CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
+BUILDER_IMAGE := ghcr.io/themactep/thingino-builder-image:latest
+DL_IMAGE := ghcr.io/themactep/thingino-dl:latest
+DL_CONTAINER := thingino-dl-cache
+
+THINGINO_REPO := https://github.com/themactep/thingino-firmware.git
+THINGINO_DIR ?= $(HOME)/.cache/thingino-w3u-build/thingino-firmware
+CCACHE_DIR ?= $(HOME)/.buildroot-ccache
+
+PROFILES := \
+	jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u \
+	jooan_w3u_t23n_cv2003_dual_eth+atbm6132u
+
+ifeq ($(findstring podman,$(CONTAINER_ENGINE)),podman)
+	CONTAINER_RUN := $(CONTAINER_ENGINE) run --rm --userns=keep-id
+else
+	CONTAINER_RUN := $(CONTAINER_ENGINE) run --rm --user $(shell id -u):$(shell id -g) --network=host
+endif
+
+.PHONY: help version prepare-thingino dl-cache build build-sc2336p build-cv2003 \
+        collect validate release clean
 
 help:
-	@echo "Jooan W3-U Firmware Makefile"
-	@echo ""
-	@echo "Version: $(VERSION)"
+	@echo "Jooan W3-U Dual-Sensor Thingino Firmware (v$(VERSION))"
 	@echo ""
 	@echo "Targets:"
-	@echo "  version           Show current version"
-	@echo "  version-next      Show next version options"
-	@echo "  version-major     Bump major version (X.0.0)"
-	@echo "  version-minor     Bump minor version (X.Y.0)"
-	@echo "  version-patch     Bump patch version (X.Y.Z)"
-	@echo "  build             Build both profiles (container)"
-	@echo "  build-unique      Build unique profile only"
-	@echo "  build-dual        Build dual profile only"
-	@echo "  test              Run CI tests locally (QEMU)"
-	@echo "  release           Create GitHub release (requires clean tree)"
-	@echo "  clean             Clean build artifacts"
+	@echo "  prepare-thingino  Clone/update official themactep/thingino-firmware & apply patches/profiles"
+	@echo "  build             Build both dual-sensor firmwares (SC2336P + CV2003), validate & copy to firmware/"
+	@echo "  build-sc2336p     Build Dual SC2336P profile only"
+	@echo "  build-cv2003      Build Dual CV2003 profile only"
+	@echo "  validate          Verify U-Boot 2013.07 SPL header + kernel/rootfs/data magics & SHA256SUMS"
+	@echo "  clean             Remove build output directory"
 
 version:
 	@echo $(VERSION)
 
-version-next:
-	@./scripts/version.sh next
-
-version-major:
-	./scripts/version.sh major
-
-version-minor:
-	./scripts/version.sh minor
-
-version-patch:
-	./scripts/version.sh patch
-
-build: build-unique build-dual
-
-build-unique:
-	docker run --rm --userns=keep-id \
-	  -v $(PWD):/workspace -v $(PWD)/overrides:/overrides \
-	  -w /workspace -e BR2_DL_DIR=/dl \
-	  ghcr.io/themactep/thingino-builder-image:latest \
-	  bash -c "make CAMERA=jooan_w3u_t23n_sc2336p_unique_eth_atbm6132u defconfig build_fast pack"
-
-build-dual:
-	docker run --rm --userns=keep-id \
-	  -v $(PWD):/workspace -v $(PWD)/overrides:/overrides \
-	  -w /workspace -e BR2_DL_DIR=/dl \
-	  ghcr.io/themactep/thingino-builder-image:latest \
-	  bash -c "make CAMERA=jooan_w3u_t23n_sc2336p_dual_eth_atbm6132u defconfig build_fast pack"
-
-test:
-	@echo "Running validation checks..."
-	@for bin in output/master/*/images/thingino-*.bin; do \
-	  echo "Checking $$bin"; \
-	  xxd -l 4 "$$bin" | grep -q "06050403" || { echo "FAIL: bad u-boot magic"; exit 1; }; \
-	  xxd -s 0x70000 -l 4 "$$bin" | grep -q "27051956" || { echo "FAIL: bad kernel magic"; exit 1; }; \
-	  xxd -s 0x200000 -l 4 "$$bin" | grep -q "68737173" || { echo "FAIL: bad rootfs magic"; exit 1; }; \
-	  xxd -s 0x710000 -l 4 "$$bin" | grep -q "8519" || { echo "FAIL: bad data magic"; exit 1; }; \
-	  echo "OK: $$bin"; \
-	done
-	@echo "All images valid!"
-
-release:
-	@if [ -z "$(VERSION_ARG)" ]; then \
-	  echo "Usage: make release VERSION_ARG=x.y.z"; \
-	  exit 1; \
+prepare-thingino:
+	@mkdir -p "$(dir $(THINGINO_DIR))" "$(CCACHE_DIR)"
+	@if [ ! -d "$(THINGINO_DIR)/.git" ]; then \
+		git clone --depth 1 "$(THINGINO_REPO)" "$(THINGINO_DIR)"; \
 	fi
-	./scripts/release.sh $(VERSION_ARG)
+	@git -C "$(THINGINO_DIR)" submodule update --init --depth 1
+	@./scripts/apply-to-thingino.sh "$(THINGINO_DIR)"
+
+dl-cache:
+	@if ! $(CONTAINER_ENGINE) ps -a --format '{{.Names}}' | grep -q '^$(DL_CONTAINER)$$'; then \
+		$(CONTAINER_ENGINE) pull $(DL_IMAGE) && \
+		$(CONTAINER_ENGINE) create --name $(DL_CONTAINER) $(DL_IMAGE) /bin/true; \
+	fi
+
+build: prepare-thingino dl-cache
+	@for cam in $(PROFILES); do \
+		$(MAKE) build-one PROFILE="$$cam"; \
+	done
+	@$(MAKE) collect validate
+
+build-sc2336p: prepare-thingino dl-cache
+	@$(MAKE) build-one PROFILE="jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u"
+	@$(MAKE) collect validate
+
+build-cv2003: prepare-thingino dl-cache
+	@$(MAKE) build-one PROFILE="jooan_w3u_t23n_cv2003_dual_eth+atbm6132u"
+	@$(MAKE) collect validate
+
+build-one:
+	@echo "=== Building $(PROFILE) in $(BUILDER_IMAGE) ==="
+	$(CONTAINER_RUN) \
+		--volumes-from $(DL_CONTAINER) \
+		-v "$(THINGINO_DIR)":/workspace \
+		-v "$(THINGINO_DIR)/overrides":/overrides \
+		-v "$(CCACHE_DIR)":/home/ubuntu/.buildroot-ccache \
+		-w /workspace -e BR2_DL_DIR=/dl \
+		$(BUILDER_IMAGE) \
+		bash -c "sudo update-alternatives --install /usr/bin/install install /usr/bin/gnuinstall 100 2>/dev/null || true; WORKFLOW=1 PRISTINE=1 make CAMERA=$(PROFILE) defconfig build_fast pack"
+
+collect:
+	@mkdir -p firmware
+	@for cam in $(PROFILES); do \
+		img_dir="$(THINGINO_DIR)/output/master/$${cam}-3.10.14-uclibc/images"; \
+		if [ -f "$$img_dir/thingino-$${cam}.bin" ]; then \
+			cp -f "$$img_dir/thingino-$${cam}.bin" firmware/; \
+			[ -f "$$img_dir/$${cam}.md" ] && cp -f "$$img_dir/$${cam}.md" firmware/ || true; \
+		fi; \
+	done
+	@cd firmware && sha256sum thingino-jooan_w3u_t23n_*_dual_eth+atbm6132u.bin > SHA256SUMS.txt
+
+validate:
+	@echo "=== Validating firmware images ==="
+	@for cam in $(PROFILES); do \
+		bin="firmware/thingino-$${cam}.bin"; \
+		[ -f "$$bin" ] || { echo "MISSING: $$bin"; exit 1; }; \
+		size=$$(stat -c%s "$$bin"); \
+		[ "$$size" -eq 8388608 ] || { echo "FAIL: $$bin size $$size != 8388608"; exit 1; }; \
+		xxd -l 4 "$$bin" | grep -q "0605 0403" || { echo "FAIL: $$bin bad SPL magic"; exit 1; }; \
+		xxd -s 12 -l 2 "$$bin" | grep -q "8037" || { echo "FAIL: $$bin not U-Boot 2013.07 (expected 0x80370000)"; exit 1; }; \
+		dd if="$$bin" bs=1 count=327680 2>/dev/null | strings | grep -q "SPL 2013.07" || { echo "FAIL: $$bin missing SPL 2013.07 banner"; exit 1; }; \
+		xxd -s 0x70000 -l 4 "$$bin" | grep -q "2705 1956" || { echo "FAIL: $$bin bad kernel uImage magic"; exit 1; }; \
+		xxd -s 0x200000 -l 4 "$$bin" | grep -q "6873 7173" || { echo "FAIL: $$bin bad squashfs magic"; exit 1; }; \
+		echo "OK: $$bin (8 MiB, U-Boot 2013.07, kernel+squashfs verified)"; \
+	done
+	@cd firmware && sha256sum -c SHA256SUMS.txt
 
 clean:
-	docker run --rm --userns=keep-id \
-	  -v $(PWD):/workspace -v $(PWD)/overrides:/overrides \
-	  -w /workspace -e BR2_DL_DIR=/dl \
-	  ghcr.io/themactep/thingino-builder-image:latest \
-	  bash -c "make CAMERA=jooan_w3u_t23n_sc2336p_unique_eth_atbm6132u clean && \
-	           make CAMERA=jooan_w3u_t23n_sc2336p_dual_eth_atbm6132u clean"
-	rm -rf output/
+	rm -rf "$(THINGINO_DIR)/output"

@@ -1,57 +1,29 @@
-# Validation (offline)
+# Validation Report (Offline Binary & RootFS Inspection)
 
-Both firmwares were validated **offline** (images inspected without hardware).
-The camera cannot be used for on-device testing until its flash chip is replaced.
+Both 8 MiB dual-sensor images (`jooan_w3u_t23n_sc2336p_dual_eth+atbm6132u` and `jooan_w3u_t23n_cv2003_dual_eth+atbm6132u`) built from official `themactep/thingino-firmware` (`master+e923f27`, 2026-11-15) passed all structural, bootloader, kernel, module, and Raptor configuration checks:
 
-## Checks performed
+## 1. Flash Partition Layout (`8 388 608` bytes exact)
 
-On the final 8 MiB `.bin` (both profiles):
+`mtdparts=jz_sfc:320k(boot),64k(env),64k(backup),1600k(kernel),5248k(rootfs),896k(data),8192k@0(all)`
 
-| Offset   | Expected | Meaning | Result |
-|----------|----------|---------|--------|
-| `0x0`    | `06050403`   | U-Boot magic | ✅ both |
-| `0x50000` | env         | decoded with `strings` | ✅ both |
-| `0x60000` | `ffffffff`  | backup env (unprogrammed) | ✅ both |
-| `0x70000` | `27051956`  | uImage magic (kernel) | ✅ both |
-| `0x200000`| `68737173`  | `hsqs` squashfs magic (rootfs) | ✅ both |
-| `0x710000`| `85190320`  | jffs2 magic (data/overlay) | ✅ both |
+| Offset | Partition | Magic / Expected | SC2336P Dual | CV2003 Dual |
+|--------|-----------|------------------|--------------|-------------|
+| `0x000000` | `boot` (320K) | `06050403` + load `0x80370000` + `SPL 2013.07` | ✅ | ✅ |
+| `0x050000` | `env` (64K) | `osmem=30M@0x0`, `rmem=34M@0x1e00000`, pure `sf probe` `bootcmd` | ✅ | ✅ |
+| `0x060000` | `backup` (64K) | `0xffffffff` | ✅ | ✅ |
+| `0x070000` | `kernel` (1600K) | `27051956` (LZMA uImage 3.10.14) | ✅ | ✅ |
+| `0x200000` | `rootfs` (5248K) | `68737173` (`hsqs` SquashFS XZ) | ✅ | ✅ |
+| `0x720000` | `data` (896K) | `8519` (JFFS2 overlayfs upperdir) | ✅ | ✅ |
 
-On the U-Boot tree and env:
+## 2. RootFS, Kernel Modules & Raptor Configuration
 
-- Built tree reports `U_BOOT_VERSION "Thingino U-Boot for Ingenic 2013.07"`
-  (`PLAIN_VERSION "2013.07"`) — i.e. the legacy bootloader, not the 2026.07 that
-  bricks this board.
-- `bootcmd` has **no** `run autoupdate; run loaduenv;` prefix (2013.07 flow) and
-  uses `sf probe` with the correct 8-partition `mtdparts`.
-- `mtdparts=jz_sfc:320k(boot),64k(env),64k(backup),1600k(kernel),5184k(rootfs),960k(data),8192k@0(all)`
-
-## Environment (per profile)
-
-| Variable | Unique | Dual |
-|----------|--------|------|
-| `osmem`  | `41M@0x0`             | `30M@0x0`            |
-| `rmem`   | `23M@0x2900000`       | `34M@0x1e00000`      |
-| sensor modules | `sensor_sc2336p_t23.ko` | `sensor_sc2336ps0_t23.ko` + `sensor_sc2336ps1_t23.ko` |
-| sensor blob | `sc2336p-t23.bin`   | — |
-
-## Rootfs / overlay
-
-- Kernel sensor modules for the profile are present inside `rootfs.squashfs`
-  (`unsquashfs`).
-- The per-camera overlay (`usr/sbin/sinfo` + `etc/init.d/S99sensor-diag`) is
-  packed into the `data` partition (overlayfs upperdir at runtime), not into the
-  squashfs.
-- `thingino-sensor-info` binary is available at `/usr/sbin/sinfo`; the custom
-  cross-compiled `sinfo` shadows it at runtime via the data overlay.
-
-## Artifacts / hashes
-
-`firmware/SHA256SUMS.txt` + Buildroot reports in `firmware/*.md` (exact partition
-sizes, build commit `master+6e8a0f6`, duration, image names).
-
-## Not yet validated on hardware
-
-- Both lenses actually probing (`sinfo`/dmesg on the camera)
-- RTSP ch0/ch1 + ch2/ch3 streaming at 15 fps
-- WiFi (ATBM6132U) and wired Ethernet bring-up
-- Motors / button / SD
+- `/etc/modules.d/20-isp`: `tx_isp_t23 isp_clk=200000000 direct_mode=0 isp_memopt=0 print_level=1 mipi_switch_gpio=7`
+- `/etc/modules.d/30-sensor_1`: `sensor_sc2336ps0_t23 reset_gpio=18` / `sensor_cv2003s0_t23 reset_gpio=18`
+- `/etc/modules.d/30-sensor_2`: `sensor_sc2336ps1_t23 reset_gpio=16` / `sensor_cv2003s1_t23 reset_gpio=16`
+- `/etc/modules.d/40-audio`: `audio spk_gpio=63 spk_level=0`
+- Wi-Fi & SD: `atbm6132u.ko`, `jzmmc_v12.ko`, `exfat.ko`, `vfat.ko` present
+- Sensor IQ blobs in `/usr/share/sensor/`: `sc2336p-t23.bin` (`176 288` B) and `cv2003-t23.bin` (`176 288` B) + `s0`/`s1` symlinks
+- `/etc/raptor.conf`:
+  - `[sensor0]` & `[sensor1]` both carry `width = 1920`, `height = 1080`, `fps = 15`
+  - `[rtsp]` exposes `ch0` (S0 1080p + AAC + backchannel), `ch1` (S0 360p), `ch2` (S1 1080p), `ch3` (S1 360p)
+  - `[osd]` sets `isp_osd = true`
